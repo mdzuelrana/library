@@ -2,10 +2,11 @@ from django.shortcuts import render
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
+from rest_framework.permissions import IsAdminUser,AllowAny,DjangoModelPermissions,IsAuthenticated
 from django.utils.timezone import now
-
+from tasks.permissions import IsAdminOrReadOnly,IsReviewAuthorOrReadOnly,IsLibrarianOrReadOnly
 from .models import Author, Book, Member, BorrowRecord
-from .serializers import AuthorSerializer, BookSerializer, MemberSerializer, BorrowRecordSerializer
+from .serializers import AuthorSerializer, BookSerializer, MemberSerializer, BorrowRecordSerializer,ReviewSerializer
 # Create your views here.
 
 
@@ -13,11 +14,19 @@ from .serializers import AuthorSerializer, BookSerializer, MemberSerializer, Bor
 class AuthorViewSet(viewsets.ModelViewSet):
     queryset = Author.objects.all()
     serializer_class = AuthorSerializer
+    
 
 
 class BookViewSet(viewsets.ModelViewSet):
     queryset = Book.objects.all()
     serializer_class = BookSerializer
+    #permission_classes=[IsAdminOrReadOnly,IsLibrarianOrReadOnly]
+    # permission_classes=[DjangoModelPermissions]
+    
+    def get_permissions(self):
+        if self.action in ['create', 'update', 'partial_update', 'destroy']:
+            return [IsAdminUser()]   
+        return [IsAuthenticated()] 
 
 
 class MemberViewSet(viewsets.ModelViewSet):
@@ -28,6 +37,7 @@ class MemberViewSet(viewsets.ModelViewSet):
 class BorrowRecordViewSet(viewsets.ModelViewSet):
     queryset = BorrowRecord.objects.all()
     serializer_class = BorrowRecordSerializer
+    permission_classes=[IsAuthenticated]
 
     @action(detail=False, methods=['post'])
     def borrow(self, request):
@@ -70,3 +80,19 @@ class BorrowRecordViewSet(viewsets.ModelViewSet):
         book.save()
 
         return Response({"message": "Book returned successfully"})
+    
+    
+class ReviewViewSet(viewsets.ModelViewSet):
+    serializer_class=ReviewSerializer
+    permission_classes=[IsReviewAuthorOrReadOnly]
+    
+    def perform_create(self,serializer):
+        serializer.save(user=self.request.user)
+    
+    def perform_update(self,serializer):
+        serializer.save(user=self.request.user)
+        
+    def get_queryset(self):
+        return Book.objects.filter(book_id=self.kwargs['book_pk'])
+    def get_serializer_context(self):
+        return {'book_id':self.kwargs['book_pk']}

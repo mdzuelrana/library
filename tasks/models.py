@@ -1,6 +1,6 @@
 from django.db import models
-
-
+from django.conf import settings
+from django.core.validators import MinValueValidator,MaxValueValidator
 class Author(models.Model):
     name = models.CharField(max_length=100)
     biography = models.TextField(blank=True)
@@ -19,7 +19,18 @@ class Book(models.Model):
     def __str__(self):
         return self.title
 
-
+class Review(models.Model):
+    book=models.ForeignKey(Book,on_delete=models.CASCADE)
+    user=models.ForeignKey(settings.AUTH_USER_MODEL,on_delete=models.CASCADE)
+    comment=models.TextField()
+    created_at=models.DateField(auto_now_add=True)
+    updated_at=models.DateField(auto_now=True)
+    ratings=models.PositiveIntegerField(validators=[MinValueValidator(1),MaxValueValidator(5)])
+    
+    def __str__(self):
+        return f'Review by {self.user.first_name} on {self.book.title}'
+    
+    
 class Member(models.Model):
     name = models.CharField(max_length=100)
     email = models.EmailField(unique=True)
